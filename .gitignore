@@ -21,3 +21,8 @@ secrets/
 # Local/editor files
 .vscode/
 .DS_Store
+
+src/secrets.h
+
+*.bak
+*.before_*
