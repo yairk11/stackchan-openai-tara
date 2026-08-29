@@ -1,4 +1,4 @@
-# TARA Project
+﻿# TARA Project
 
 ## Goal
 TARA is a self-contained embodied desktop robot based on CoreS3 + TV98 + OpenAI Realtime.
@@ -21,7 +21,7 @@ Main goals:
 
 ## Windows Project
 Path:
-C:\Users\User\Documents\PlatformIO\Projects\stackchan-openai-tara
+Clone the repository to any local folder.
 
 Main firmware:
 src\main.cpp
@@ -140,22 +140,8 @@ Recent V1 stabilization commit:
 Message:
 feat: stabilize TARA V1 audio streaming and Hebrew default
 
-Do not push to origin yet.
 Current origin points to:
 https://github.com/yairk11/stackchan-openai-tara.git
-
-## Checkpoints
-Known checkpoints:
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-083425
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-084709
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220030
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220438
-
-Latest known manual checkpoint:
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260829_V1_RELEASE_PREP
-
-Note:
-The thinking-until-first-audio patch was made after that checkpoint.
 
 ## Terminal Names
 Use these names:
@@ -183,3 +169,4 @@ Never give Android shell commands inside PowerShell.
 - After build: upload.
 - After stable milestone: Git commit / checkpoint.
 - Avoid large refactors unless necessary.
+
