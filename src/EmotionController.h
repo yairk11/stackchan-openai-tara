@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 // Non-blocking robot-side emotion/effect preset controller.
-// Gemini should call high-level emotion names; this controller owns smooth LED effects.
+// TARA should use high-level emotion names; this controller owns smooth LED effects.
 class EmotionController {
  public:
   void begin();
