@@ -1,76 +1,210 @@
-# Build and flash
+# Build, Flash and Install TARA V1
 
-## Prerequisites
+This guide describes the current TARA V1 setup for:
 
+- Windows PC
+- M5Stack CoreS3 / StackChan
+- TV98 Android box with Termux
+- OpenAI Realtime API
+
+## 1. Prerequisites
+
+On Windows, install:
+
+- Visual Studio Code
+- PlatformIO
 - Python 3
-- PlatformIO Core
-- USB access to the M5Stack CoreS3 device
+- ADB platform tools
+- USB drivers for the CoreS3 if required
 
-Install PlatformIO:
+The TV98 requires:
 
-```bash
-python3 -m pip install -U platformio
+- Termux
+- Termux:Boot
+- Python inside Termux
+- network access to OpenAI
+
+## 2. Configure Wi-Fi
+
+The current V1 firmware uses a local secrets file:
+
+```text
+src/secrets.h
 ```
 
-## Build
+Create it locally with the required Wi-Fi values.
 
-From repository root:
+Example:
 
-```bash
+```cpp
+#pragma once
+
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+```
+
+This file is ignored by Git.
+
+Never commit real Wi-Fi credentials.
+
+## 3. Build the CoreS3 Firmware
+
+From the repository root in PowerShell:
+
+```powershell
 pio run -e m5stack-cores3
 ```
 
-Successful output produces:
+A successful build creates:
 
 ```text
 .pio/build/m5stack-cores3/firmware.bin
 ```
 
-The `.pio/` directory and firmware artifacts are ignored by git.
+## 4. Flash the CoreS3
 
-## Flash
 
-Connect the robot by USB and identify the serial port. On many Linux systems it is `/dev/ttyACM0`.
+Connect the CoreS3 to the Windows PC by USB.
 
-```bash
-pio run -e m5stack-cores3 -t upload --upload-port /dev/ttyACM0
+Then run:
+
+```powershell
+pio run -e m5stack-cores3 -t upload
 ```
 
-If upload fails with permissions, add your user to the appropriate serial group or fix udev rules. A temporary local workaround is to adjust device-node permissions, but a persistent group/udev setup is better.
+If multiple serial ports are present, specify the port explicitly.
 
-## First setup
+Example:
 
-If Wi-Fi credentials are missing or the configured network cannot be reached, the firmware starts a WPA2 setup access point named `<robot_id>-setup-XXXX` and serves the Web UI at:
+```powershell
+pio run -e m5stack-cores3 -t upload --upload-port COM5
+```
+
+## 5. Prepare the TV98 Environment
+
+On the TV98, TeRmux home is:
 
 ```text
-http://192.168.4.1/
+/data/data/com.termux/files/home
 ```
 
-The `XXXX` suffix is the last four hex digits shown in the setup SSID; the AP password is `stackchanXXXX`.
+The TARA runtime uses:
 
-Use the Web UI to set Wi-Fi SSID/password, Gemini API key, and Web password. Reboot after changing network settings.
+```text
+/data/data/com.termux/files/home/realtime_server.py
+/data/data/com.termux/files/home/stackchan.env
+/data/data/com.termux/files/home/server.log
+/data/data/com.termux/files/home/tara_memory.json
+```
 
-## Serial monitor
+## 6. Install the TV98 Server
 
-```bash
+Copy the repository file:
+
+```text
+tv98/realtime_server.py
+```
+
+to:
+
+```text
+/data/data/com.termux/files/home/realtime_server.py
+```
+
+The server uses the OpenAI Realtime API.
+
+## 7. Configure the OpenAI API Key
+
+On the TV98, create:
+
+```text
+/data/data/com.termux/files/home/stackchan.env
+```
+
+Start from the repository example:
+
+```text
+tv98/stackchan.env.example
+```
+
+Example:
+
+```text
+OPENAI_API_KEY=YOUR_OPENAI_API_KEY_HERE
+```
+
+Never commit a real OpenAI API key.
+
+## 8. Configure Automatic Startup
+
+TARA V1 uses Termux:Boot to start the server automatically after the TV98 boots.
+
+The repository includes:
+
+```text
+tv98/start-stackchan.sh
+```
+
+It should be installed as the Termux:Boot startup script.
+
+The script:
+
+- loads `stackchan.env`
+- waits 15 seconds for networking
+- starts `realtime_server.py`
+- appends output to `server.log`
+
+## 9. Verify the TV98 Server
+
+After startup, the server should listen on port:
+
+```text
+8002
+```
+
+The server log file is:
+
+```text
+/data/data/com.termux/files/home/server.log
+```
+
+## 10. Serial Monitor
+
+To view CoreS3 logs from Windows:
+
+```powershell
 pio device monitor -b 115200
 ```
 
-Useful boot messages:
+## 11. First Full Test
 
-- `SD status: ok`
-- `ConfigManager init: ok`
-- `WiFi: connected ip=...`
-- `Gemini: ready for on-demand connect`
+After both devices are ready:
 
-## Fresh checkout build check
+1. Power on the TV98.
+2. Wait for Termux:Boot to start the server.
+3. Power on the CoreS3.
+4. Wait for Wi-Fi connection.
+5. Touch TARA to start a turn.
+6. Speak normally.
+7. VErify that TARA replies in Hebrew.
+8. Verify that speaker playback completes.
 
-For release verification, build from a clean copy so local build cache does not hide missing dependencies:
+## 12. Fresh Checkout Verification
 
-```bash
-rm -rf /tmp/stackchan-firmware-fresh
-mkdir -p /tmp/stackchan-firmware-fresh
-rsync -a --exclude='.git' --exclude='.pio' ./ /tmp/stackchan-firmware-fresh/
-cd /tmp/stackchan-firmware-fresh
+Before a release, verify that a clean clone builds without depending on local cache.
+
+On Windows, a fresh copy of the repository should be able to run:
+
+```powershell
 pio run -e m5stack-cores3
 ```
+
+## 13. Security Checklist
+
+Before publishing:
+
+- `stackchan.env` is not committed
+- `src/secrets.h` is not committed
+- no real OpenAI API key is committed
+- no real Wi-Fi password is committed
+- runtime logs are not committed
