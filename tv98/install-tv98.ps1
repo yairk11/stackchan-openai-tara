@@ -1,7 +1,23 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
-$Adb = "C:\Users\User\Downloads\platform-tools-latest-windows\platform-tools\adb.exe"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+$AdbCommand = Get-Command adb.exe -ErrorAction SilentlyContinue
+if ($AdbCommand) {
+    $Adb = $AdbCommand.Source
+}
+else {
+    $Candidates = @(
+        "$env:USERPROFILE\Downloads\platform-tools-latest-windows\platform-tools\adb.exe",
+        "$env:USERPROFILE\Downloads\platform-tools\adb.exe"
+    )
+
+    $Adb = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+    if (-not $Adb) {
+        throw "adb.exe was not found. Install Android Platform Tools or add adb.exe to PATH."
+    }
+}
 
 & $Adb push "$Root\realtime_server.py" /sdcard/realtime_server.py
 & $Adb push "$Root\start-stackchan.sh" /sdcard/start-stackchan.sh
