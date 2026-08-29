@@ -32,7 +32,13 @@ The current V1 firmware uses a local secrets file:
 src/secrets.h
 ```
 
-Create it locally with the required Wi-Fi values.
+You can create it automatically from the example file by running:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup-core.ps1
+```
+
+Then edit src/secrets.h and enter the required Wi-Fi values.
 
 Example:
 
