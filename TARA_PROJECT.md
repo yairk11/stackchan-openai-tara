@@ -142,7 +142,7 @@ feat: stabilize TARA V1 audio streaming and Hebrew default
 
 Do not push to origin yet.
 Current origin points to:
-https://github.com/taranton/stackchan-gemini-firmware.git
+https://github.com/yairk11/stackchan-openai-tara.git
 
 ## Checkpoints
 Known checkpoints:
