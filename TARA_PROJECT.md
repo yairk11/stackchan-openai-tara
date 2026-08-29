@@ -132,7 +132,7 @@ Do not refactor working areas unnecessarily.
 
 ## Git
 Current working baseline commit:
-fa0676c
+207616f
 
 Recent V1 stabilization commit:
 39831f5
@@ -152,7 +152,7 @@ C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220030
 C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220438
 
 Latest known manual checkpoint:
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260829-070436
+C:\Users\User\Desktop\TARA_CHECKPOINT_20260829_V1_RELEASE_PREP
 
 Note:
 The thinking-until-first-audio patch was made after that checkpoint.
