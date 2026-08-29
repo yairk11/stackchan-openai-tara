@@ -1,4 +1,4 @@
-﻿#!/data/data/com.termux/files/usr/bin/bash
+#!/data/data/com.termux/files/usr/bin/bash
 
 export PATH=/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin
 export HOME=/data/data/com.termux/files/home

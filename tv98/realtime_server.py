@@ -2,6 +2,8 @@ import asyncio
 import base64
 import json
 import os
+import urllib.error
+import urllib.request
 from array import array
 
 from websockets.asyncio.client import connect
@@ -18,6 +20,7 @@ PORT = 8002
 ENV_FILE = "stackchan.env"
 
 MODEL = "gpt-realtime-2.1"
+WEB_SEARCH_MODEL = "gpt-5.6-luna"
 
 CORE_INPUT_RATE = 16000
 OPENAI_INPUT_RATE = 24000
@@ -96,6 +99,77 @@ def save_memory(memory):
     except Exception as e:
         print("MEMORY SAVE ERROR:", repr(e))
         return False
+
+
+def extract_response_text(response_data):
+    parts = []
+
+    for item in response_data.get("output", []):
+        if item.get("type") != "message":
+            continue
+
+        for content in item.get("content", []):
+            if content.get("type") != "output_text":
+                continue
+
+            text = str(content.get("text", "")).strip()
+            if text:
+                parts.append(text)
+
+    return "\n".join(parts).strip()
+
+
+def run_web_search(api_key, query):
+    query = str(query).strip()
+
+    if not query:
+        return {"ok": False, "error": "empty_query"}
+
+    payload = {
+        "model": WEB_SEARCH_MODEL,
+        "tools": [{"type": "web_search"}],
+        "input": (
+            "Search the public web for current reliable information. "
+            "Answer accurately and concisely. User query: " + query
+        )
+    }
+
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        answer = extract_response_text(data)
+
+        if not answer:
+            return {
+                "ok": False,
+                "error": "no_search_answer",
+                "query": query
+            }
+
+        return {
+            "ok": True,
+            "query": query,
+            "answer": answer
+        }
+
+    except Exception as e:
+        print("WEB SEARCH ERROR:", repr(e))
+        return {
+            "ok": False,
+            "error": str(e),
+            "query": query
+        }
 
 
 # ============================================================
@@ -351,12 +425,36 @@ def make_session_update():
                 },
                 {
                     "type": "function",
+                    "name": "web_search",
+                    "description": (
+                        "Search the live public internet for current or "
+                        "time-sensitive information. Use this for weather, "
+                        "news, prices, exchange rates, sports, current events, "
+                        "opening hours, recent facts, and whenever the user "
+                        "asks for information that may have changed."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "query"
+                        ]
+                    }
+                },
+                {
+                    "type": "function",
                     "name": "remember_fact",
                     "description": (
-                        "Save a useful non-sensitive fact the user clearly wants "
-                        "remembered across future sessions, such as preferences or "
-                        "favorite things. Never store passwords, API keys, secrets, "
-                        "addresses, financial data, health data, or other sensitive information."
+                        "Save a durable non-sensitive personal fact that will be useful "
+                        "in future conversations, even when the user does not explicitly "
+                        "ask you to remember it. Examples include names of family members, "
+                        "number of children, pets, hobbies, preferences, favorite things, "
+                        "and recurring routines. Never store passwords, API keys, secrets, "
+                        "exact addresses, financial data, health data, or other sensitive information."
                     ),
                     "parameters": {
                         "type": "object",
@@ -389,11 +487,18 @@ def make_session_update():
                 "Do not call motion tools repeatedly or during speech. "
                 "When the user explicitly asks you to show or set an emotion, "
                 "call set_emotion with the matching StackChan emotion before speaking. "
+                "You have live internet access through the web_search tool. "
+                "For weather, news, current prices, exchange rates, sports, "
+                "current events, recent information, or any question whose "
+                "answer may have changed, call web_search before answering. "
+                "If the user explicitly asks you to search the internet, use web_search. "
+                "Never claim that you cannot access live information when "
+                "web_search can answer the request. "
                 "Behave like a compact embodied desktop robot, not like a "
                 "disembodied chatbot. "
                 "Speak naturally and conversationally. "
                 "Speak at a calm, slightly slower pace with clear pauses. "
-                "When the user explicitly asks you to remember a durable non-sensitive preference or fact, call remember_fact before replying. Keep ordinary spoken replies concise and natural. "
+                "When the user tells you a durable non-sensitive personal fact that would be useful in future conversations, such as names of family members, number of children, pets, hobbies, preferences, favorite things, or recurring routines, call remember_fact before replying even if the user did not explicitly ask you to remember it. Also call remember_fact whenever the user explicitly asks you to remember a non-sensitive fact. Never store passwords, API keys, secrets, exact addresses, financial data, health data, or other sensitive information. Keep ordinary spoken replies concise and natural. "
                 "Usually answer in one short sentence. "
                 "Never give more than two short sentences unless "
                 "the user explicitly asks for a longer explanation."
@@ -869,7 +974,32 @@ async def handle_stackchan(stackchan_ws):
                             "tool": tool_name
                         }
 
-                        if tool_name == "remember_fact":
+                        if tool_name == "web_search":
+                            query = str(
+                                tool_args.get(
+                                    "query",
+                                    ""
+                                )
+                            ).strip()
+
+                            print(
+                                ">>> TARA TOOL "
+                                f"web_search "
+                                f"{query}"
+                            )
+
+                            tool_result = await asyncio.to_thread(
+                                run_web_search,
+                                api_key,
+                                query
+                            )
+
+                            print(
+                                ">>> WEB SEARCH "
+                                f"ok={tool_result.get('ok', False)}"
+                            )
+
+                        elif tool_name == "remember_fact":
                             fact = str(
                                 tool_args.get(
                                     "fact",
