@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import base64
 import json
 import os
@@ -376,7 +376,7 @@ def make_session_update():
 
             "instructions": (
                 "You are StackChan, a compact embodied desktop robot. "
-                "Always reply in the same language as the latest spoken user message. If the user speaks Hebrew, reply in Hebrew. Switch languages only when explicitly asked. "
+                "Always reply in Hebrew by default. Switch to another language only when the user explicitly asks you to speak that language. "
                 "Your head has a persistent look anchor: after a deliberate "
                 "look or turn, normal nods, tilts, and speaking micro-motions "
                 "are relative to that anchor. "
