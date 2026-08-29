@@ -1,125 +1,204 @@
-# StackChan Gemini Firmware
+# TARA V1
 
-Experimental firmware for an M5Stack CoreS3 StackChan robot with Gemini Live voice, SD-backed runtime configuration, local memory, Web UI/API controls, camera smoke tests, servo gestures, and an optional LAN tool gateway.
+TARA is an embodied desktop robot built around:
 
-This repository is intended for developers and hobbyists who are comfortable with PlatformIO, ESP32-S3 flashing, and SD-card configuration. It is not yet a one-click consumer installer.
+- M5Stack CoreS3 / StackChan
+- TV98 Android box running Termux
+- OpenAI Realtime API
+- PlatformIO on Windows
 
-## What is included
+The current V1 architecture uses the CoreS3 for the robot hardware and audio interface, while the TV98 acts as the local realtime server between the robot and OpenAI.
 
-- M5Stack CoreS3 / StackChan BSP firmware built with PlatformIO and Arduino.
-- Gemini Live audio conversation path with configurable model, voice, VAD, prompts, and microphone gain.
-- SD-backed configuration under `/app/StackChan/`.
-- Local Web UI/API for runtime config, secrets, prompts, memory inspection, camera smoke tests, servo controls, sensors, and voice toggling.
-- HTTP Basic Auth for the Web UI/API once a password is set.
-- Local append-only memory store for recent events/dialogues/summaries and search/debug endpoints.
-- Optional LAN gateway client for external tools such as Hermes/Home Assistant integrations.
+## Current Status
 
-## Current status
+TARA V1 is working and has been tested with repeated realtime conversations.
 
-This is an experimental developer firmware tree. The defaults are conservative:
+Verified features include:
 
-- Wi-Fi: uses configured station credentials when available; otherwise starts a simple setup access point.
-- Gemini: disabled until configured on SD/Web UI and a Gemini API key is provided.
-- Web UI: available on the LAN after Wi-Fi connects, or at the setup access point IP during first setup.
-- Gateway tools: disabled unless explicitly configured.
+- Hebrew voice conversation by default
+- OpenAI Realtime responses
+- CoreS3 microphone streaming
+- Speaker playback
+- Touch-to-talk interaction
+- Head gestures
+- Emotion / face states
+- Persistent memory
+- Automatic TV98 startup through Termux:Boot
+- Recovery after power cycle
+- OpenAI session recovery
+- WebSocket reconnect handling
 
-On first setup or after Wi-Fi failure, the firmware starts a WPA2 setup access point named `<robot_id>-setup-XXXX` and serves the Web UI at `http://192.168.4.1/`. Use it to enter Wi-Fi SSID/password, Gemini key, and a Web password, then reboot. The `XXXX` suffix is shown in the AP SSID; use password `stackchanXXXX`.
+## Architecture
+
+```text
+CoreS3 / StackChan
+        |
+        | WebSocket / PCM16 audio
+        v
+TV98 / Termux
+realtime_server.py
+        |
+        | OpenAI Realtime API
+        v
+OpenAI
+```
+
+CoreS3 microphone audio is recorded at 16 kHz PCM16.
+
+The TV98 server converts the input stream for OpenAI Realtime and sends OpenAI audio responses back to the CoreS3 at 24 kHz PCM16.
 
 ## Hardware
 
-Target environment:
+Current V1 hardware:
 
-- M5Stack CoreS3 based StackChan hardware.
-- SD card available to the firmware.
-- Camera support enabled by build flags.
-- PlatformIO environment: `m5stack-cores3`.
+- M5Stack CoreS3
+- StackChan-compatible servo hardware
+- TV98 Android box
+- Wi-Fi network
+- Windows PC for development and flashing
 
-## Quick start
+## Repository Layout
 
-1. Install PlatformIO Core.
+```text
+src/
+    main.cpp
 
-   ```bash
-   python3 -m pip install -U platformio
-   ```
+tv98/
+    realtime_server.py
+    start-stackchan.sh
+    stackchan.env.example
 
-2. Clone the repository.
+lib/
+    StackChan-BSP/
+    WebSockets/
 
-   ```bash
-   git clone https://github.com/taranton/stackchan-gemini-firmware.git
-   cd stackchan-gemini-firmware
-   ```
+docs/
+examples/
+TARA_PROJECT.md
+platformio.ini
+```
 
-3. Build.
+## CoreS3 Firmware
 
-   ```bash
-   pio run -e m5stack-cores3
-   ```
+The firmware is built with PlatformIO.
 
-4. Prepare SD card files. See [docs/SD_LAYOUT.md](docs/SD_LAYOUT.md) and copy/adapt files from `examples/`.
+PlatformIO environment: `m5stack-cores3`
 
-5. Flash over USB.
+Build: `pio run -e m5stack-cores3`
 
-   ```bash
-   pio run -e m5stack-cores3 -t upload --upload-port /dev/ttyACM0
-   ```
+Flash: `pio run -e m5stack-cores3 -t upload`
 
-6. Monitor serial logs.
+The Wi-Fi credentials used by the current development firmware are stored locally in `src/secrets.h`.
 
-   ```bash
-   pio device monitor -b 115200
-   ```
+This file is excluded from Git and must not be committed.
 
-7. If Wi-Fi connects, open the robot IP in a browser. If Wi-Fi is not configured or fails, join the `<robot_id>-setup-XXXX` access point with password `stackchanXXXX` and open `http://192.168.4.1/`. Set a Web password in the **Web security** section before using the robot on a shared LAN.
+## TV98 Server
 
-## Configuration overview
+The main TV98 server is `tv98/realtime_server.py`.
 
-Runtime config is loaded from SD:
+On the TV98 it runs from `/data/data/com.termux/files/home/realtime_server.py`.
 
-- `/app/StackChan/config/runtime.json`
-- `/app/StackChan/config/gateway.json` optional
-- `/app/StackChan/prompts/system.txt` optional
-- `/app/StackChan/prompts/persona.txt` optional
-- `/app/StackChan/secrets/gemini_api_key.txt` optional secret
-- `/app/StackChan/secrets/wifi_password.txt` optional secret
-- `/app/StackChan/secrets/gateway_token.txt` optional secret
-- `/app/StackChan/secrets/web_password_sha256.txt` generated by Web UI security setup
+The server listens for the CoreS3 WebSocket connection on port `8002`.
 
-Start from:
+Current OpenAI Realtime model: `gpt-realtime-2.1`.
 
-- `examples/runtime.example.json`
-- `examples/gateway.example.json`
+## OpenAI API Key
 
-Do not commit real secrets or SD runtime files.
+The OpenAI API key is not stored in the repository.
 
-## Web UI/API security
+On the TV98, create `/data/data/com.termux/files/home/stackchan.env` from `tv98/stackchan.env.example`.
 
-When no Web password is set, the Web UI/API is open so a first password can be configured without locking out the device. After setting a password:
+Example:
 
-- username: `stackchan`
-- password: the value you set in Web UI
-- stored on SD as SHA-256, not plaintext
-- most Web/API routes require HTTP Basic Auth
+```text
+OPENAI_API_KEY=YOUR_OPENAI_API_KEY_HERE
+```
 
-This is LAN hardening, not Internet-grade security. Do not expose the robot Web UI directly to the public Internet.
+Never commit a real API key.
 
-See [docs/WEB_SECURITY.md](docs/WEB_SECURITY.md).
+## Automatic TV98 Startup
 
-## Useful docs
+The repository includes `tv98/start-stackchan.sh`.
 
-- [Build and flash](docs/BUILD_FLASH.md)
-- [SD card layout](docs/SD_LAYOUT.md)
-- [Web security](docs/WEB_SECURITY.md)
-- [HTTP API overview](docs/API.md)
-- [Feature matrix](docs/FEATURES.md)
-- [Prompt examples](docs/PROMPTS.md)
-- [Memory internals](docs/MEMORY_INTERNALS.md)
+The production startup flow uses Termux:Boot. The script loads `stackchan.env`, waits for Android networking to initialize, starts `realtime_server.py`, and writes server output to `server.log`.
 
-## Development notes
+TV98 runtime files:
 
-- Build outputs live under `.pio/` and are ignored by git.
-- Firmware artifacts such as `*.bin`, `*.elf`, and `*.map` are ignored by git.
-- The StackChan BSP is vendored under `lib/StackChan-BSP` so a fresh checkout can build without local `/tmp/...` paths.
+```text
+/data/data/com.termux/files/home/realtime_server.py
+/data/data/com.termux/files/home/stackchan.env
+/data/data/com.termux/files/home/server.log
+/data/data/com.termux/files/home/tara_memory.json
+```
+
+## Language Behavior
+
+TARA replies in Hebrew by default. It switches to another language only when the user explicitly asks it to speak that language.
+
+## Persistent Memory
+
+TARA supports persistent memory through `tara_memory.json`.
+
+The OpenAI tool used to save remembered information is `remember_fact`.
+
+Stored memory is reloaded into new OpenAI sessions. Sensitive information such as passwords, API keys, financial information, and similar secrets should not be stored in memory.
+
+## Audio
+
+```text
+CoreS3 microphone: PCM16 / 16000 Hz
+OpenAI input:      PCM16 / 24000 Hz
+OpenAI output:     PCM16 / 24000 Hz
+```
+
+The TV98 server performs the required input conversion.
+
+## WebSocket Stability
+
+TARA uses a vendored copy of the WebSockets library under `lib/WebSockets/`.
+
+The V1 build contains a stability patch that increases the ESP32 WebSocket write timeout from 500 ms to 2000 ms. The previous 500 ms timeout caused valid audio transmissions to be aborted during short network stalls.
+
+## Development Environment
+
+Main development environment:
+
+- Windows
+- VS Code
+- PlatformIO
+- PowerShell
+- ADB for TV98 management
+
+Main firmware: `src/main.cpp`
+
+Main TV98 server: `tv98/realtime_server.py`
+
+## Project State
+
+Detailed engineering notes and current project state are kept in `TARA_PROJECT.md`.
+
+## V1 Goal
+
+TARA V1 is intended to operate without manual intervention after power-on:
+
+1. TV98 boots
+2. Termux:Boot starts the realtime server
+3. CoreS3 connects to Wi-Fi
+4. TARA is ready for conversation
+5. Reconnect and OpenAI session recovery happen automatically
+
+## Security
+
+Do not commit:
+
+- `src/secrets.h`
+- `stackchan.env`
+- OpenAI API keys
+- Wi-Fi passwords
+- other runtime secrets
+
+Use example/template files for public configuration.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+See `LICENSE`.
