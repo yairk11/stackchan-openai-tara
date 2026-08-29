@@ -41,6 +41,9 @@ REALTIME_URL = (
 
 MEMORY_FILE = "tara_memory.json"
 
+# Only one CoreS3 WebSocket connection may be active at a time.
+active_stackchan_ws = None
+
 
 def load_memory():
     try:
@@ -427,7 +430,33 @@ def make_session_update():
 # ============================================================
 
 async def handle_stackchan(stackchan_ws):
+    global active_stackchan_ws
+
     remote = stackchan_ws.remote_address
+
+    previous_ws = active_stackchan_ws
+    active_stackchan_ws = stackchan_ws
+
+    if (
+        previous_ws is not None
+        and previous_ws is not stackchan_ws
+    ):
+        print(
+            "Replacing previous StackChan connection:",
+            previous_ws.remote_address
+        )
+
+        try:
+            await previous_ws.close(
+                code=1012,
+                reason="Replaced by newer StackChan connection"
+            )
+
+        except Exception as e:
+            print(
+                "Previous StackChan close error:",
+                repr(e)
+            )
 
     print()
     print("==============================")
@@ -1366,6 +1395,9 @@ async def handle_stackchan(stackchan_ws):
     )
 
     print("--------------------------------")
+
+    if active_stackchan_ws is stackchan_ws:
+        active_stackchan_ws = None
 
 
 # ============================================================

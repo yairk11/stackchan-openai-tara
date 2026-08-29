@@ -94,6 +94,9 @@ static bool lastScreenPressed = false;
 
 static uint32_t micChunkCounter = 0;
 
+static uint32_t lastRssiLogMs = 0;
+static constexpr uint32_t RSSI_LOG_INTERVAL_MS = 10000;
+
 // =====================================================
 // AUDIO QUEUE
 // =====================================================
@@ -344,6 +347,13 @@ static bool startMicrophone() {
 
     delay(30);
 
+    auto micConfig = M5.Mic.config();
+    micConfig.magnification = 4;
+    M5.Mic.config(micConfig);
+
+    Serial.print("MIC MAGNIFICATION: ");
+    Serial.println(micConfig.magnification);
+
     if (!M5.Mic.begin()) {
         Serial.println("Mic begin failed");
         return false;
@@ -371,7 +381,9 @@ static void startSpeakerModeNow() {
 
     delay(30);
 
-    M5.Speaker.begin();
+    bool speakerBeginOk = M5.Speaker.begin();
+    Serial.print("SPEAKER BEGIN: ");
+    Serial.println(speakerBeginOk ? "OK" : "FAIL");
 
     M5.Speaker.setVolume(
         SPEAKER_VOLUME
@@ -1485,6 +1497,19 @@ void loop() {
         webSocket.loop();
     }
 
+    uint32_t nowMs = millis();
+
+    if (
+        WiFi.status() == WL_CONNECTED &&
+        nowMs - lastRssiLogMs >= RSSI_LOG_INTERVAL_MS
+    ) {
+        lastRssiLogMs = nowMs;
+
+        Serial.print("RSSI: ");
+        Serial.print(WiFi.RSSI());
+        Serial.println(" dBm");
+    }
+
     serviceSpeakerAudio();
 
 #if defined(ARDUINO_M5STACK_CORES3)
@@ -1539,4 +1564,7 @@ void loop() {
 
     delay(1);
 }
+
+
+
 
