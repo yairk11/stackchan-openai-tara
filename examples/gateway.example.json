@@ -1,5 +1,0 @@
-{
-  "gateway_enabled": false,
-  "gateway_base_url": "http://YOUR_GATEWAY_HOST:8811/stackchan",
-  "robot_id": "stackchan"
-}
