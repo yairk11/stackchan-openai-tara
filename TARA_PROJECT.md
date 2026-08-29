@@ -1,4 +1,4 @@
-﻿# TARA Project
+# TARA Project
 
 ## Goal
 TARA is a self-contained embodied desktop robot based on CoreS3 + TV98 + OpenAI Realtime.
@@ -86,9 +86,8 @@ mode 600
 
 ## Language Behavior
 Current instruction:
-Always reply in the same language as the latest spoken user message.
-If the user speaks Hebrew, reply in Hebrew.
-Switch languages only when explicitly asked.
+Always reply in Hebrew by default.
+Switch to another language only when the user explicitly asks you to speak that language.
 
 ## Emotion Goal
 Desired flow:
@@ -103,58 +102,21 @@ It remains triggered when the first binary audio packet arrives.
 
 Build and upload succeeded after this patch.
 
-## Current Main Bug
-Duplicate/stale WebSocket connections.
+## Current Status
+TARA V1 is currently stable in tested operation.
 
-Observed:
-Multiple ESTAB connections from the same CoreS3 to TV98:8002.
+The previous WebSocket fast-fail problem was traced to an aggressive 500 ms write timeout in the vendored WebSockets library. The timeout was increased to 2000 ms and the robot completed repeated OpenAI Realtime conversations successfully.
 
-Examples:
-- 2 simultaneous ESTAB connections
-- later 3 simultaneous ESTAB connections
-
-When this happens CoreS3 audio send can stall badly:
-send around 10000 ms
-result=FAIL
-
-Temporary cleanup:
-pkill -f realtime_server.py
-
-This is only a workaround.
-
-## Next Technical Priority
-Fix duplicate/stale WebSocket connections properly.
-
-Investigate in realtime_server.py:
-handle_stackchan(stackchan_ws)
-
-Questions:
-- Why does an old StackChan connection stay ESTAB after reconnect/reset?
-- Does the old handler remain alive?
-- Are sender/receiver tasks cancelled correctly?
-- Is stackchan_ws explicitly closed in finally?
-- Should there be a single-active-client policy?
-- Should the previous Core connection be closed when a new one arrives?
-- Should server-side ping/timeout settings be added or tightened?
-
-Desired solution:
-At most one active CoreS3 WebSocket connection at any time.
-When a new CoreS3 connection arrives:
-- close the old one
-- cancel its tasks
-- clear its queues
-- keep only the new connection active
-
-Do not break:
-- audio pacing
-- turn sequencing
-- reconnect logic
-- memory
-- tools
-- emotions
-
-After this bug is fixed:
-re-test thinking yellow behavior.
+Current verified behavior:
+- CoreS3 audio streaming works.
+- OpenAI Realtime replies work.
+- Hebrew is the default reply language.
+- Touch-to-turn interaction works.
+- Speaker playback completes.
+- Head gestures and emotions work.
+- Persistent memory works.
+- TV98 automatic startup works.
+- Reconnect behavior has been tested successfully.
 
 ## Important Existing Patches
 - touch dedup patch
@@ -170,10 +132,13 @@ Do not refactor working areas unnecessarily.
 
 ## Git
 Current working baseline commit:
-d91fbda
+fa0676c
+
+Recent V1 stabilization commit:
+39831f5
 
 Message:
-TARA working baseline: OpenAI Realtime, audio, emotions and reconnect
+feat: stabilize TARA V1 audio streaming and Hebrew default
 
 Do not push to origin yet.
 Current origin points to:
@@ -187,7 +152,7 @@ C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220030
 C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220438
 
 Latest known manual checkpoint:
-C:\Users\User\Desktop\TARA_CHECKPOINT_20260826-220438
+C:\Users\User\Desktop\TARA_CHECKPOINT_20260829-070436
 
 Note:
 The thinking-until-first-audio patch was made after that checkpoint.
