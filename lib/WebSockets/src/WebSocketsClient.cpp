@@ -635,9 +635,10 @@ void WebSocketsClient::handleClientData(void) {
                 break;
             default:
                 Serial.printf(
-                    "WS1002 DEBUG status=%d len=%d\n",
+                    "WS1002 DEBUG status=%d len=%d tcp=%p\n",
                     (int)_client.status,
-                    len
+                    len,
+                    (void*)_client.tcp
                 );
                 WebSockets::clientDisconnect(&_client, 1002);
                 break;

@@ -1,4 +1,4 @@
-#include <Arduino.h>
+﻿#include <Arduino.h>
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <M5Unified.h>
@@ -391,6 +391,7 @@ static void startSpeakerModeNow() {
 
     speakerStarted = true;
 
+
     emotion.setEmotion("speaking");
 
     Serial.println();
@@ -437,6 +438,16 @@ static void finishSpeakerMode() {
     Serial.println("TARA STOPPED LISTENING");
 
     emotion.setEmotion("neutral");
+
+    ServoGestureController::Step restingHead[] = {
+        {0, 420, 500, 450, false}
+    };
+
+    servoGestures.queueSteps(
+        "speaking_head_rest",
+        restingHead,
+        1
+    );
 }
 
 // =====================================================
@@ -606,6 +617,10 @@ static bool connectWiFi() {
     Serial.print("RSSI: ");
     Serial.print(WiFi.RSSI());
     Serial.println(" dBm");
+    Serial.print("BSSID: ");
+    Serial.println(WiFi.BSSIDstr());
+    Serial.print("Channel: ");
+    Serial.println(WiFi.channel());
 
     return true;
 }
@@ -683,21 +698,11 @@ static bool handleTaraMotionCommand(
         const char* gesture =
             doc["gesture"] | "";
 
-        bool queued =
-            servoGestures.queueGesture(
-                String(gesture)
-            );
-
         Serial.print(
-            "TARA SERVO GESTURE: "
+            "TARA SERVO GESTURE SKIPPED: "
         );
-        Serial.print(gesture);
-        Serial.print(" result=");
-        Serial.println(
-            queued
-                ? "OK"
-                : "FAIL"
-        );
+        Serial.println(gesture);
+
 
         return true;
     }
@@ -1167,7 +1172,7 @@ static void startConversation() {
 
     while (
         !serverReady &&
-        millis() - started < 15000
+        millis() - started < 30000
     ) {
         M5StackChan.update();
 
@@ -1464,8 +1469,14 @@ void setup() {
         "neutral"
     );
 
-    servoGestures.queueGesture(
-        "center_head"
+    ServoGestureController::Step startupHead[] = {
+        {0, 420, 500, 700, false}
+    };
+
+    servoGestures.queueSteps(
+        "startup_head_30",
+        startupHead,
+        1
     );
 
     clearAudioQueue();
@@ -1564,6 +1575,8 @@ void loop() {
 
     delay(1);
 }
+
+
 
 
 

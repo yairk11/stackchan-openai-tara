@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import base64
 import json
 import os
@@ -513,7 +513,7 @@ def make_session_update():
                     },
 
                     "turn_detection": {
-                        "type": "semantic_vad"
+                        "type": "server_vad"
                     }
                 },
 
@@ -1613,6 +1613,7 @@ if __name__ == "__main__":
     asyncio.run(
         main()
     )
+
 
 
 
