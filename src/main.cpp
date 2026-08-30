@@ -1,4 +1,4 @@
-﻿#include <Arduino.h>
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <M5Unified.h>
@@ -1501,6 +1501,26 @@ void setup() {
 void loop() {
     M5StackChan.update();
 
+    static String serialCommand;
+
+    while (Serial.available() > 0) {
+        char c = (char)Serial.read();
+
+        if (c == '\n' || c == '\r') {
+            serialCommand.trim();
+
+            if (serialCommand.equalsIgnoreCase("shutdown")) {
+                Serial.println("TARA SHUTDOWN");
+                Serial.flush();
+                delay(200);
+                M5.Power.powerOff();
+            }
+
+            serialCommand = "";
+        } else {
+            serialCommand += c;
+        }
+    }
     emotion.loop();
     servoGestures.loop();
 
