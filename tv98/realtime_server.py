@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import base64
 import json
 import os
@@ -899,6 +899,9 @@ async def handle_stackchan(stackchan_ws):
 
                 pending_tool_calls = []
                 response_audio_started = False
+                subtitle_text = ""
+                subtitle_last_sent = 0.0
+
 
                 async for message in openai_ws:
                     event = json.loads(
@@ -910,6 +913,54 @@ async def handle_stackchan(stackchan_ws):
                         ""
                     )
 
+
+                    if "transcript" in event_type:
+                        print("OPENAI TRANSCRIPT EVENT:", event_type)
+                        print(json.dumps(event, ensure_ascii=False))
+
+                    if (
+                        event_type
+                        == "response.output_audio_transcript.delta"
+                    ):
+                        delta = str(event.get("delta", ""))
+
+                        if delta:
+                            subtitle_text += delta
+
+                            now = asyncio.get_running_loop().time()
+
+                            if (
+                                now - subtitle_last_sent
+                                >= 0.15
+                            ):
+                                await queue_text({
+                                    "type": "subtitle",
+                                    "text": subtitle_text
+                                })
+
+                                subtitle_last_sent = now
+
+                        continue
+
+                    if (
+                        event_type
+                        == "response.output_audio_transcript.done"
+                    ):
+                        subtitle_text = str(
+                            event.get("transcript", subtitle_text)
+                        )
+
+                        if subtitle_text:
+                            await queue_text({
+                                "type": "subtitle",
+                                "text": subtitle_text
+                            })
+
+                            subtitle_last_sent = (
+                                asyncio.get_running_loop().time()
+                            )
+
+                        continue
 
                     if (
                         event_type
@@ -1160,7 +1211,12 @@ async def handle_stackchan(stackchan_ws):
                             ">>> RESPONSE CREATED"
                         )
 
+                        subtitle_text = ""
+                        subtitle_last_sent = 0.0
+
                         response_audio_started = False
+
+
 
                         continue
 
@@ -1239,6 +1295,9 @@ async def handle_stackchan(stackchan_ws):
                         event_type
                         == "response.done"
                     ):
+                        print("OPENAI RESPONSE DONE EVENT:")
+                        print(json.dumps(event, ensure_ascii=False))
+
                         if pending_tool_calls:
                             print(
                                 ">>> TOOL RESPONSE DONE"

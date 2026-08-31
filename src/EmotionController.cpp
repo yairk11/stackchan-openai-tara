@@ -1,4 +1,5 @@
 #include "EmotionController.h"
+#include "HebrewFont22.h"
 
 #include <M5StackChan.h>
 #include <M5Unified.h>
@@ -10,6 +11,184 @@ constexpr uint32_t kFaceIntervalMs = 90;   // ~11 FPS for idle LCD; avoid steali
 constexpr uint32_t kSpeakingFaceIntervalMs = 40;  // Stable LCD cadence while speaking; keep audio safe.
 constexpr uint32_t kSleepDisplayOffMs = 30000;  // Anti-retention: show sleep face briefly, then blank LCD.
 
+const TaraGlyph22* findTaraGlyph22(uint16_t codepoint) {
+  for (size_t i = 0; i < taraGlyph22Count; ++i) {
+    if (taraGlyph22[i].codepoint == codepoint) {
+      return &taraGlyph22[i];
+    }
+  }
+  return nullptr;
+}
+
+void drawTaraGlyph22(
+    M5Canvas& canvas,
+    int x,
+    int y,
+    uint16_t codepoint,
+    uint16_t color) {
+  const TaraGlyph22* glyph = findTaraGlyph22(codepoint);
+  if (glyph == nullptr || glyph->width == 0 || glyph->height == 0) {
+    return;
+  }
+
+  const uint8_t bytesPerRow = (glyph->width + 7) / 8;
+
+  for (uint8_t gy = 0; gy < glyph->height; ++gy) {
+    for (uint8_t gx = 0; gx < glyph->width; ++gx) {
+      const size_t byteIndex =
+          static_cast<size_t>(gy) * bytesPerRow + (gx / 8);
+
+      const uint8_t value =
+          pgm_read_byte(glyph->bitmap + byteIndex);
+
+      const uint8_t mask = 0x80 >> (gx & 7);
+
+      if (value & mask) {
+        canvas.drawPixel(x + gx, y + gy, color);
+      }
+    }
+  }
+}
+size_t decodeUtf8ToCodepoints(
+    const String& text,
+    uint16_t* output,
+    size_t maxCount) {
+  size_t count = 0;
+  const uint8_t* p =
+      reinterpret_cast<const uint8_t*>(text.c_str());
+
+  while (*p != 0 && count < maxCount) {
+    uint32_t codepoint = 0;
+
+    if ((*p & 0x80) == 0) {
+      codepoint = *p++;
+    } else if ((*p & 0xE0) == 0xC0 && p[1] != 0) {
+      codepoint =
+          ((static_cast<uint32_t>(p[0] & 0x1F) << 6) |
+           static_cast<uint32_t>(p[1] & 0x3F));
+      p += 2;
+    } else if ((*p & 0xF0) == 0xE0 &&
+               p[1] != 0 &&
+               p[2] != 0) {
+      codepoint =
+          ((static_cast<uint32_t>(p[0] & 0x0F) << 12) |
+           (static_cast<uint32_t>(p[1] & 0x3F) << 6) |
+           static_cast<uint32_t>(p[2] & 0x3F));
+      p += 3;
+    } else {
+      ++p;
+      continue;
+    }
+
+    if (codepoint <= 0xFFFF) {
+      output[count++] = static_cast<uint16_t>(codepoint);
+    }
+  }
+
+  return count;
+}
+int measureHebrewTextWidth(const String& text) {
+  uint16_t codepoints[128];
+  const size_t count =
+      decodeUtf8ToCodepoints(text, codepoints, 128);
+
+  int width = 0;
+
+  for (size_t i = 0; i < count; ++i) {
+    const TaraGlyph22* glyph = findTaraGlyph22(codepoints[i]);
+
+    if (glyph != nullptr) {
+      width += glyph->xAdvance;
+    }
+  }
+
+  return width;
+}
+
+size_t wrapHebrewText(
+    const String& text,
+    int maxWidth,
+    String* lines,
+    size_t maxLines) {
+  if (maxLines == 0) return 0;
+
+  String words[64];
+  size_t wordCount = 0;
+  int start = 0;
+
+  while (start < text.length() && wordCount < 64) {
+    while (start < text.length() && text[start] == ' ') ++start;
+    if (start >= text.length()) break;
+
+    int end = text.indexOf(' ', start);
+    if (end < 0) end = text.length();
+
+    words[wordCount++] = text.substring(start, end);
+    start = end + 1;
+  }
+
+  size_t lineCount = 0;
+  String current = "";
+
+  for (size_t i = 0; i < wordCount; ++i) {
+    String candidate = current.length() == 0
+        ? words[i]
+        : current + " " + words[i];
+
+    if (measureHebrewTextWidth(candidate) <= maxWidth) {
+      current = candidate;
+      continue;
+    }
+
+    if (current.length() > 0) {
+      if (lineCount < maxLines) {
+        lines[lineCount++] = current;
+      }
+      current = words[i];
+    } else {
+      current = words[i];
+    }
+  }
+
+  if (current.length() > 0 && lineCount < maxLines) {
+    lines[lineCount++] = current;
+  }
+
+  return lineCount;
+}
+
+int drawHebrewLineRtl(
+    M5Canvas& canvas,
+    const String& text,
+    int rightX,
+    int topY,
+    uint16_t color) {
+  uint16_t codepoints[128];
+  const size_t count =
+      decodeUtf8ToCodepoints(text, codepoints, 128);
+
+  int x = rightX;
+
+  for (size_t i = 0; i < count; ++i) {
+    const uint16_t cp = codepoints[i];
+    const TaraGlyph22* glyph = findTaraGlyph22(cp);
+
+    if (glyph == nullptr) {
+      continue;
+    }
+
+    x -= glyph->xAdvance;
+
+    drawTaraGlyph22(
+        canvas,
+        x,
+        topY,
+        cp,
+        color);
+  }
+
+  return x;
+}
 String lowerTrimmed(String s) {
   s.trim();
   s.toLowerCase();
@@ -22,6 +201,16 @@ int triWave(uint16_t phase, int amplitude) {
   return ((v * 2 * amplitude) / 255) - amplitude;
 }
 }  // namespace
+
+void EmotionController::setSubtitle(const String& text) {
+  subtitle_ = text;
+  lastFaceMs_ = 0;
+}
+
+void EmotionController::clearSubtitle() {
+  subtitle_ = "";
+  lastFaceMs_ = 0;
+}
 
 void EmotionController::begin() {
   setEmotion("neutral");
@@ -197,6 +386,100 @@ void EmotionController::renderFace() {
   const int cy = h / 2;
   d.fillSprite(TFT_BLACK);
 
+  if (mode_ == Mode::Speaking) {
+    const int marginX = 14;
+    const int bubbleTop = 42;
+    const int bubbleBottom = h - 18;
+    const int bubbleWidth = w - (marginX * 2);
+    const int bubbleHeight = bubbleBottom - bubbleTop;
+    const int radius = 14;
+    const int border = 3;
+
+    d.drawRoundRect(
+        marginX,
+        bubbleTop,
+        bubbleWidth,
+        bubbleHeight,
+        radius,
+        TFT_YELLOW);
+
+    d.drawRoundRect(
+        marginX + 1,
+        bubbleTop + 1,
+        bubbleWidth - 2,
+        bubbleHeight - 2,
+        radius - 1,
+        TFT_YELLOW);
+
+    d.drawLine(
+        marginX + 28,
+        bubbleBottom - 1,
+        marginX + 16,
+        h - 6,
+        TFT_YELLOW);
+
+    d.drawLine(
+        marginX + 29,
+        bubbleBottom - 1,
+        marginX + 18,
+        h - 6,
+        TFT_YELLOW);
+
+    d.drawLine(
+        marginX + 16,
+        h - 6,
+        marginX + 44,
+        bubbleBottom - 1,
+        TFT_YELLOW);
+
+    d.drawLine(
+        marginX + 18,
+        h - 6,
+        marginX + 45,
+        bubbleBottom - 1,
+        TFT_YELLOW);
+
+    String text = subtitle_;
+    text.trim();
+
+    if (text.length() > 0) {
+      const int textRight = w - marginX - 14;
+      const int textLeft = marginX + 14;
+      const int textTop = bubbleTop + 14;
+      const int textBottom = bubbleBottom - 12;
+      const int textWidth = textRight - textLeft;
+      const int lineHeight = 27;
+      const size_t maxVisibleLines =
+          static_cast<size_t>((textBottom - textTop) / lineHeight);
+
+      String wrappedLines[32];
+      const size_t lineCount = wrapHebrewText(
+          text,
+          textWidth,
+          wrappedLines,
+          32);
+
+      size_t firstLine = 0;
+      if (lineCount > maxVisibleLines) {
+        firstLine = lineCount - maxVisibleLines;
+      }
+
+      int y = textTop;
+      for (size_t i = firstLine; i < lineCount; ++i) {
+        drawHebrewLineRtl(
+            d,
+            wrappedLines[i],
+            textRight,
+            y,
+            TFT_WHITE);
+
+        y += lineHeight;
+      }
+    }
+
+    canvas.pushSprite(&display, 0, 0);
+    return;
+  }
   uint16_t eyeColor = TFT_CYAN;
   uint16_t accent = TFT_DARKCYAN;
   bool closed = false;

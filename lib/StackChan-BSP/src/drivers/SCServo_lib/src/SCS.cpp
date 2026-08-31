@@ -1,9 +1,10 @@
-﻿/*
+/*
  * SCS.cpp
  * FIT serial servo communication layer protocol program
  */
 
 #include <stddef.h>
+#include <Arduino.h>
 #include "SCS.h"
 
 SCS::SCS()

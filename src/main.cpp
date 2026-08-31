@@ -692,6 +692,30 @@ static bool handleTaraMotionCommand(
     if (
         strcmp(
             type,
+            "subtitle"
+        ) == 0
+    ) {
+        const char* subtitleText =
+            doc["text"] | "";
+
+        emotion.setSubtitle(
+            String(subtitleText)
+        );
+
+        Serial.print(
+            "TARA SUBTITLE: "
+        );
+        Serial.println(
+            subtitleText
+        );
+
+        return true;
+    }
+
+
+    if (
+        strcmp(
+            type,
             "servo_gesture"
         ) == 0
     ) {
@@ -713,121 +737,13 @@ static bool handleTaraMotionCommand(
             "head_motion"
         ) == 0
     ) {
-        ServoGestureController::Step steps[6]{};
-        uint8_t count = 0;
-
-        JsonArrayConst arr =
-            doc["steps"]
-                .as<JsonArrayConst>();
-
-        for (
-            JsonObjectConst step :
-            arr
-        ) {
-            if (count >= 6) {
-                break;
-            }
-
-            float xDeg =
-                step["x_deg"] | 0.0f;
-
-            float yDeg =
-                step["y_deg"] | 0.0f;
-
-            int speed =
-                step["speed"] | 500;
-
-            int holdMs =
-                step["hold_ms"] | 500;
-
-            xDeg =
-                constrain(
-                    xDeg,
-                    -65.0f,
-                    65.0f
-                );
-
-            yDeg =
-                constrain(
-                    yDeg,
-                    -6.0f,
-                    40.0f
-                );
-
-            steps[count].x =
-                clampMotionInt(
-                    static_cast<int>(
-                        xDeg * 10.0f
-                    ),
-                    -650,
-                    650
-                );
-
-            steps[count].y =
-                clampMotionInt(
-                    static_cast<int>(
-                        yDeg * 10.0f
-                    ),
-                    -60,
-                    400
-                );
-
-            steps[count].speed =
-                clampMotionInt(
-                    speed,
-                    100,
-                    700
-                );
-
-            steps[count].holdMs =
-                static_cast<uint16_t>(
-                    clampMotionInt(
-                        holdMs,
-                        100,
-                        1500
-                    )
-                );
-
-            steps[count].relative = true;
-
-            count++;
-        }
-
-        if (count == 0) {
-            Serial.println(
-                "TARA HEAD MOTION: missing_steps"
-            );
-
-            return true;
-        }
-
-        const char* motionNameRaw =
-            doc["motion_name"]
-                | "custom_motion";
-
-        String motionName(
-            motionNameRaw
-        );
-
-        bool queued =
-            servoGestures.queueSteps(
-                motionName,
-                steps,
-                count
-            );
+        const char* motionName =
+            doc["motion_name"] | "custom_motion";
 
         Serial.print(
-            "TARA HEAD MOTION: "
+            "TARA HEAD MOTION SKIPPED: "
         );
-        Serial.print(motionName);
-        Serial.print(" steps=");
-        Serial.print(count);
-        Serial.print(" result=");
-        Serial.println(
-            queued
-                ? "OK"
-                : "FAIL"
-        );
+        Serial.println(motionName);
 
         return true;
     }
@@ -1463,7 +1379,10 @@ void setup() {
     emotion.begin();
     servoGestures.begin();
 
-    M5StackChan.Motion.goHome();
+    M5StackChan.Motion.setAutoTorqueReleaseEnabled(false);
+    M5StackChan.Motion.setAutoAngleSyncEnabled(false);
+
+    // M5StackChan.Motion.goHome();  // Disabled: can cause abrupt servo jump on reset.
 
     emotion.setEmotion(
         "neutral"
@@ -1514,6 +1433,27 @@ void loop() {
                 Serial.flush();
                 delay(200);
                 M5.Power.powerOff();
+            } else if (serialCommand.equalsIgnoreCase("center")) {
+                ServoGestureController::Step centerHead[] = {
+                    {0, 420, 180, 1000, false}
+                };
+
+                servoGestures.queueSteps(
+                    "manual_center",
+                    centerHead,
+                    1
+                );
+
+                Serial.println("TARA MANUAL CENTER");
+            } else if (serialCommand.equalsIgnoreCase("angles")) {
+                Serial.print("TARA ANGLES yaw=");
+                Serial.print(
+                    M5StackChan.Motion.getCurrentYawAngle()
+                );
+                Serial.print(" pitch=");
+                Serial.println(
+                    M5StackChan.Motion.getCurrentPitchAngle()
+                );
             }
 
             serialCommand = "";

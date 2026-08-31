@@ -10,6 +10,8 @@ class EmotionController {
   bool setEmotion(const String& emotion);
   const String& currentEmotion() const { return current_; }
   void loop();
+  void setSubtitle(const String& text);
+  void clearSubtitle();
 
  private:
   enum class Mode {
@@ -33,6 +35,7 @@ class EmotionController {
   uint16_t frame_ = 0;
   bool sleepDisplayOff_ = false;
   uint8_t savedDisplayBrightness_ = 127;
+  String subtitle_;
 
   static Mode parseMode(const String& emotion, String& normalized);
   static void hsvToRgb(uint8_t h, uint8_t s, uint8_t v, uint8_t& r, uint8_t& g, uint8_t& b);

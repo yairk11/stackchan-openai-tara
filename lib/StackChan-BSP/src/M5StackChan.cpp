@@ -173,7 +173,7 @@ public:
 
     void set_angle_impl(int angle) override
     {
-        int mapped_angle = _zero_pos + angle * 16 / 5 / 10;  // 一步对应 0.3125度, 0.3125 = 5/16
+        int mapped_angle = _zero_pos + angle * 16 / 5 / 10;  // 0.3125 degrees per raw position unit (5/16).
         mapped_angle     = uitk_intl::clamp(mapped_angle, _config.rawPosLimit.x, _config.rawPosLimit.y);
 
         // ESP_LOGI(TAG, "Servo ID: %d mapped angle: %d", _config.id, mapped_angle);
@@ -185,10 +185,20 @@ public:
     int getCurrentAngle() override
     {
         int current_pos = _scs_bus.ReadPos(_config.id);
-        int angle       = (current_pos - _zero_pos) * 5 * 10 / 16;
-        angle           = uitk_intl::clamp(angle, getAngleLimit().x, getAngleLimit().y);
-        // ESP_LOGI(TAG, "Servo ID: %d current pos: %d angle: %d", _id, current_pos, angle);
-        return angle;
+
+        if (
+            current_pos < _config.rawPosLimit.x ||
+            current_pos > _config.rawPosLimit.y
+        ) {
+            return stackchan::motion::Servo::getCurrentAngle();
+        }
+
+        int angle = (current_pos - _zero_pos) * 5 * 10 / 16;
+        return uitk_intl::clamp(
+            angle,
+            getAngleLimit().x,
+            getAngleLimit().y
+        );
     }
 
     bool is_moving_impl() override
