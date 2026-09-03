@@ -439,15 +439,6 @@ static void finishSpeakerMode() {
 
     emotion.setEmotion("neutral");
 
-    ServoGestureController::Step restingHead[] = {
-        {0, 420, 500, 450, false}
-    };
-
-    servoGestures.queueSteps(
-        "speaking_head_rest",
-        restingHead,
-        1
-    );
 }
 
 // =====================================================
@@ -629,22 +620,6 @@ static bool connectWiFi() {
 // TARA MOTION COMMANDS
 // =====================================================
 
-static int clampMotionInt(
-    int value,
-    int minimum,
-    int maximum
-) {
-    if (value < minimum) {
-        return minimum;
-    }
-
-    if (value > maximum) {
-        return maximum;
-    }
-
-    return value;
-}
-
 static bool handleTaraMotionCommand(
     const String& message
 ) {
@@ -713,94 +688,6 @@ static bool handleTaraMotionCommand(
             "head_motion"
         ) == 0
     ) {
-        ServoGestureController::Step steps[6]{};
-        uint8_t count = 0;
-
-        JsonArrayConst arr =
-            doc["steps"]
-                .as<JsonArrayConst>();
-
-        for (
-            JsonObjectConst step :
-            arr
-        ) {
-            if (count >= 6) {
-                break;
-            }
-
-            float xDeg =
-                step["x_deg"] | 0.0f;
-
-            float yDeg =
-                step["y_deg"] | 0.0f;
-
-            int speed =
-                step["speed"] | 500;
-
-            int holdMs =
-                step["hold_ms"] | 500;
-
-            xDeg =
-                constrain(
-                    xDeg,
-                    -65.0f,
-                    65.0f
-                );
-
-            yDeg =
-                constrain(
-                    yDeg,
-                    -6.0f,
-                    40.0f
-                );
-
-            steps[count].x =
-                clampMotionInt(
-                    static_cast<int>(
-                        xDeg * 10.0f
-                    ),
-                    -650,
-                    650
-                );
-
-            steps[count].y =
-                clampMotionInt(
-                    static_cast<int>(
-                        yDeg * 10.0f
-                    ),
-                    -60,
-                    400
-                );
-
-            steps[count].speed =
-                clampMotionInt(
-                    speed,
-                    100,
-                    700
-                );
-
-            steps[count].holdMs =
-                static_cast<uint16_t>(
-                    clampMotionInt(
-                        holdMs,
-                        100,
-                        1500
-                    )
-                );
-
-            steps[count].relative = true;
-
-            count++;
-        }
-
-        if (count == 0) {
-            Serial.println(
-                "TARA HEAD MOTION: missing_steps"
-            );
-
-            return true;
-        }
-
         const char* motionNameRaw =
             doc["motion_name"]
                 | "custom_motion";
@@ -809,25 +696,10 @@ static bool handleTaraMotionCommand(
             motionNameRaw
         );
 
-        bool queued =
-            servoGestures.queueSteps(
-                motionName,
-                steps,
-                count
-            );
-
         Serial.print(
-            "TARA HEAD MOTION: "
+            "TARA HEAD MOTION SKIPPED: "
         );
-        Serial.print(motionName);
-        Serial.print(" steps=");
-        Serial.print(count);
-        Serial.print(" result=");
-        Serial.println(
-            queued
-                ? "OK"
-                : "FAIL"
-        );
+        Serial.println(motionName);
 
         return true;
     }
@@ -1043,10 +915,6 @@ static void webSocketEvent(
 
             emotion.setEmotion(
                 "neutral"
-            );
-
-            servoGestures.queueGesture(
-                "center_head"
             );
 
             break;
@@ -1275,10 +1143,6 @@ static void stopConversation() {
         "neutral"
     );
 
-    servoGestures.queueGesture(
-        "center_head"
-    );
-
     Serial.println();
     Serial.println(
         "CONVERSATION STOPPED"
@@ -1461,22 +1325,9 @@ void setup() {
     M5StackChan.begin();
 
     emotion.begin();
-    servoGestures.begin();
-
-    M5StackChan.Motion.goHome();
 
     emotion.setEmotion(
         "neutral"
-    );
-
-    ServoGestureController::Step startupHead[] = {
-        {0, 420, 500, 700, false}
-    };
-
-    servoGestures.queueSteps(
-        "startup_head_30",
-        startupHead,
-        1
     );
 
     clearAudioQueue();
